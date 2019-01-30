@@ -1,0 +1,86 @@
+
+import arcpy, os, sys
+import xml.dom.minidom as DOM
+
+arcpy.env.overwriteOutput = True
+
+# Update these variables
+# serviceName = "BMP_SystemMap"
+serviceName = arcpy.GetParameterAsText(0)
+
+#tempPath = r"C:\Users\[UserName]\Documents\ArcGIS Pro 2.0\Services"
+tempPath = arcpy.GetParameterAsText(1)
+
+path2APRX = r"C:\Users\[UserName]\Documents\ArcGIS\Projects\BMPPublisher\BMPPublisher.aprx"
+
+#server_con = r"C:\Users\[UserName]\AppData\Roaming\Esri\ArcGISPro\Favorites\PGCOITGISWEBX04_6443 (admin).ags"
+#server_con = r"C:\Users\[UserName]\AppData\Roaming\Esri\ArcGISPro\Favorites\WEBEX01_Admin.ags"
+#server_con = r"C:\Users\[UserName]\AppData\Roaming\Esri\ArcGISPro\Favorites\WEBEX02_Admin.ags"
+server_con = arcpy.GetParameterAsText(3)
+
+# All paths are built by joining names to the tempPath
+SDdraftPath = os.path.join(tempPath, "tempdraft.sddraft")
+newSDdraftPath = os.path.join(tempPath, "updatedDraft.sddraft")
+SDPath = os.path.join(tempPath, serviceName + ".sd")
+
+aprx = arcpy.mp.ArcGISProject(path2APRX)
+# Refers to your map name and position within the map project in ArcPro
+m = aprx.listMaps('BMPData')[0]
+
+# Create MapServiceDraft and set service properties
+sddraft = arcpy.sharing.CreateSharingDraft('STANDALONE_SERVER', 'MAP_SERVICE', serviceName, m)
+#sddraft.serverFolder = "BMPSystemMap"
+sddraft.serverFolder = arcpy.GetParameterAsText(2)
+sddraft.targetServer = server_con
+
+# copyDataToServer = False will reference data from registered data sources with the targetServer
+sddraft.copyDataToServer = False
+sddraft.exportToSDDraft(SDdraftPath)
+
+# Read the contents of the original SDDraft into an xml parser
+doc = DOM.parse(SDdraftPath)
+
+# The follow code piece modifies the SDDraft from a new MapService with caching capabilities
+# to a FeatureService with Map, Create and Query capabilities.
+typeNames = doc.getElementsByTagName('TypeName')
+for typeName in typeNames:
+    if typeName.firstChild.data == "FeatureServer":
+        extention = typeName.parentNode
+        for extElement in extention.childNodes:
+            if extElement.tagName == 'Enabled':
+                extElement.firstChild.data = 'true'
+
+# Turn off caching
+configProps = doc.getElementsByTagName('ConfigurationProperties')[0]
+propArray = configProps.firstChild
+propSets = propArray.childNodes
+for propSet in propSets:
+    keyValues = propSet.childNodes
+    for keyValue in keyValues:
+        if keyValue.tagName == 'Key':
+            if keyValue.firstChild.data == "isCached":
+                keyValue.nextSibling.firstChild.data = "false"
+
+# Turn on feature access capabilities
+configProps = doc.getElementsByTagName('Info')[0]
+propArray = configProps.firstChild
+propSets = propArray.childNodes
+for propSet in propSets:
+    keyValues = propSet.childNodes
+    for keyValue in keyValues:
+        if keyValue.tagName == 'Key':
+            if keyValue.firstChild.data == "WebCapabilities":
+                keyValue.nextSibling.firstChild.data = "Map,Query,Data"
+
+# Write the new draft to disk
+f = open(newSDdraftPath, 'w')
+doc.writexml(f)
+f.close()
+
+# Stage the service
+arcpy.StageService_server(newSDdraftPath, SDPath)
+print("Staged service")
+
+# Upload the service
+arcpy.UploadServiceDefinition_server(SDPath, server_con)
+print("Uploaded service")
