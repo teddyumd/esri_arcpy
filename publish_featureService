@@ -1,3 +1,17 @@
+#Python Script that will let users publish to their ArcGIS Server
+#Author: Tewodros Hailegeberel
+#Date: 1/30/2019
+#This script was developed by ESRI (https://pro.arcgis.com/en/pro-app/arcpy/sharing/mapservicedraft-class.htm)
+#This script is using arcpy.GetParameterAsText to give it UI until ArcPro 2.4 comes out.
+#After you've added this script to your toolbox, you have to right click on the script and create the Parameters
+#Make sure the name matches the variable name Example: serviceName = arcpy.GetParameterAsText(0), Name 
+#should be serviceName
+#For sddraft.serverFolder = arcpy.GetParameterAsText(2) under Type, make it optional. The script by default will place
+#the service under root site if folder name is not given. Also, it will create the folder name if folder does not exist
+#For server_con = arcpy.GetParameterAsText(3) change the Filter to Value List. If you have more than one type of connection
+#you can set them to your connection names. Make sure the connections are under favorites. 
+#For tempPath = arcpy.GetParameterAsText(1) the Data Type should be Folder. This will give the user the ability to select which
+#folder they would like to use. It can also be set to a default location if you use one central location on your network or hard drive.
 
 import arcpy, os, sys
 import xml.dom.minidom as DOM
